@@ -112,15 +112,26 @@ def clean_text(text: str) -> str:
     return text
 
 # ── Model Loader (Cached via st.cache_resource) ──────────────────────────────
-@st.cache_resource(show_spinner="🎬 Loading fine-tuned DistilBERT model from ./sentiment_model...")
+@st.cache_resource(show_spinner="🎬 Loading DistilBERT model...")
 def load_sentiment_pipeline():
+    import os
     MODEL_DIR = "./sentiment_model"
-    tokenizer = BertTokenizerFast.from_pretrained(MODEL_DIR)
-    tokenizer.model_input_names = ["input_ids", "attention_mask"]
+    safetensors_path = os.path.join(MODEL_DIR, "model.safetensors")
+    bin_path = os.path.join(MODEL_DIR, "pytorch_model.bin")
+
+    # If local fine-tuned weights exist in ./sentiment_model, load from directory
+    if os.path.exists(safetensors_path) or os.path.exists(bin_path):
+        tokenizer = BertTokenizerFast.from_pretrained(MODEL_DIR)
+        tokenizer.model_input_names = ["input_ids", "attention_mask"]
+        model_source = MODEL_DIR
+    else:
+        # Streamlit Cloud fallback: load standard DistilBERT fine-tuned on SST-2 / IMDb
+        model_source = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
+        tokenizer = BertTokenizerFast.from_pretrained(model_source)
 
     classifier = hf_pipeline(
         "text-classification",
-        model=MODEL_DIR,
+        model=model_source,
         tokenizer=tokenizer,
         top_k=None,
         truncation=True,
